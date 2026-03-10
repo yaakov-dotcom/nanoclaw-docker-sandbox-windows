@@ -342,7 +342,9 @@ async function sandboxRunContainerAgent(
   }
 
   // NO_PROXY must include host.docker.internal (credential proxy is HTTP, not through HTTPS proxy)
-  const noProxyParts = [process.env.NO_PROXY, 'host.docker.internal'].filter(Boolean);
+  const noProxyParts = [process.env.NO_PROXY, 'host.docker.internal'].filter(
+    Boolean,
+  );
   const noProxy = noProxyParts.join(',');
   envArgs.push('-e', `NO_PROXY=${noProxy}`, '-e', `no_proxy=${noProxy}`);
 
@@ -352,16 +354,21 @@ async function sandboxRunContainerAgent(
   // SSL certs for proxy
   if (process.env.SSL_CERT_FILE) {
     envArgs.push(
-      '-e', 'SSL_CERT_FILE=/workspace/proxy-ca.crt',
-      '-e', 'NODE_EXTRA_CA_CERTS=/workspace/proxy-ca.crt',
+      '-e',
+      'SSL_CERT_FILE=/workspace/proxy-ca.crt',
+      '-e',
+      'NODE_EXTRA_CA_CERTS=/workspace/proxy-ca.crt',
     );
   }
 
   // 1. Start background container with tmpfs mounts
   const runArgs = [
-    'run', '-d',
-    '--name', containerName,
-    '--entrypoint', 'sleep',
+    'run',
+    '-d',
+    '--name',
+    containerName,
+    '--entrypoint',
+    'sleep',
     ...hostGatewayArgs(),
     ...tmpfsArgs,
     ...envArgs,
@@ -385,11 +392,17 @@ async function sandboxRunContainerAgent(
     try {
       execFileSync(
         'bash',
-        ['-c', `tar -cf - -C '${m.hostPath}' . | ${CONTAINER_RUNTIME_BIN} exec -i -u node ${containerName} tar --no-same-owner -xf - -C '${m.containerPath}'`],
+        [
+          '-c',
+          `tar -cf - -C '${m.hostPath}' . | ${CONTAINER_RUNTIME_BIN} exec -i -u node ${containerName} tar --no-same-owner -xf - -C '${m.containerPath}'`,
+        ],
         { stdio: 'pipe', timeout: 30000 },
       );
     } catch (err) {
-      logger.warn({ mount: m.containerPath, err }, 'Sandbox tar copy-in failed');
+      logger.warn(
+        { mount: m.containerPath, err },
+        'Sandbox tar copy-in failed',
+      );
     }
   }
 
@@ -400,10 +413,15 @@ async function sandboxRunContainerAgent(
     try {
       execFileSync(
         'bash',
-        ['-c', `tar -cf - -C '${projectRoot}' proxy-ca.crt | ${CONTAINER_RUNTIME_BIN} exec -i -u node ${containerName} tar --no-same-owner -xf - -C /workspace`],
+        [
+          '-c',
+          `tar -cf - -C '${projectRoot}' proxy-ca.crt | ${CONTAINER_RUNTIME_BIN} exec -i -u node ${containerName} tar --no-same-owner -xf - -C /workspace`,
+        ],
         { stdio: 'pipe' },
       );
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   // 3. Run agent via docker exec
@@ -437,10 +455,15 @@ async function sandboxRunContainerAgent(
         try {
           execFileSync(
             'bash',
-            ['-c', `${CONTAINER_RUNTIME_BIN} exec ${containerName} tar -cf - -C '${m.containerPath}' . 2>/dev/null | tar --no-same-owner -xf - -C '${m.hostPath}'`],
+            [
+              '-c',
+              `${CONTAINER_RUNTIME_BIN} exec ${containerName} tar -cf - -C '${m.containerPath}' . 2>/dev/null | tar --no-same-owner -xf - -C '${m.hostPath}'`,
+            ],
             { stdio: 'pipe', timeout: 30000 },
           );
-        } catch { /* container may be dead */ }
+        } catch {
+          /* container may be dead */
+        }
       }
     };
 
@@ -454,7 +477,9 @@ async function sandboxRunContainerAgent(
         while ((startIdx = parseBuffer.indexOf(OUTPUT_START_MARKER)) !== -1) {
           const endIdx = parseBuffer.indexOf(OUTPUT_END_MARKER, startIdx);
           if (endIdx === -1) break;
-          const jsonStr = parseBuffer.slice(startIdx + OUTPUT_START_MARKER.length, endIdx).trim();
+          const jsonStr = parseBuffer
+            .slice(startIdx + OUTPUT_START_MARKER.length, endIdx)
+            .trim();
           parseBuffer = parseBuffer.slice(endIdx + OUTPUT_END_MARKER.length);
           try {
             const parsed: ContainerOutput = JSON.parse(jsonStr);
@@ -465,11 +490,18 @@ async function sandboxRunContainerAgent(
             // (Claude SDK subprocesses may not exit cleanly after process.exit)
             if (parsed.result && !killTimer) {
               killTimer = setTimeout(() => {
-                logger.info({ containerName }, 'Sandbox kill timer: copying out and stopping container');
+                logger.info(
+                  { containerName },
+                  'Sandbox kill timer: copying out and stopping container',
+                );
                 doCopyOut();
                 try {
-                  execFileSync(CONTAINER_RUNTIME_BIN, ['kill', containerName], { stdio: 'pipe' });
-                } catch { /* already dead */ }
+                  execFileSync(CONTAINER_RUNTIME_BIN, ['kill', containerName], {
+                    stdio: 'pipe',
+                  });
+                } catch {
+                  /* already dead */
+                }
               }, 5000);
             }
           } catch (err) {
@@ -491,8 +523,12 @@ async function sandboxRunContainerAgent(
 
       // Remove container
       try {
-        execFileSync(CONTAINER_RUNTIME_BIN, ['rm', '-f', containerName], { stdio: 'pipe' });
-      } catch { /* already gone */ }
+        execFileSync(CONTAINER_RUNTIME_BIN, ['rm', '-f', containerName], {
+          stdio: 'pipe',
+        });
+      } catch {
+        /* already gone */
+      }
 
       const duration = Date.now() - startTime;
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -515,7 +551,9 @@ async function sandboxRunContainerAgent(
       );
 
       if (hadStreamingOutput) {
-        outputChain.then(() => resolve({ status: 'success', result: null, newSessionId }));
+        outputChain.then(() =>
+          resolve({ status: 'success', result: null, newSessionId }),
+        );
         return;
       }
 
@@ -533,9 +571,15 @@ async function sandboxRunContainerAgent(
       const ei = stdout.indexOf(OUTPUT_END_MARKER);
       if (si !== -1 && ei !== -1 && ei > si) {
         try {
-          resolve(JSON.parse(stdout.slice(si + OUTPUT_START_MARKER.length, ei).trim()));
+          resolve(
+            JSON.parse(
+              stdout.slice(si + OUTPUT_START_MARKER.length, ei).trim(),
+            ),
+          );
           return;
-        } catch { /* fall through */ }
+        } catch {
+          /* fall through */
+        }
       }
 
       resolve({ status: 'success', result: null, newSessionId });
@@ -544,8 +588,12 @@ async function sandboxRunContainerAgent(
     container.on('error', (err) => {
       if (killTimer) clearTimeout(killTimer);
       try {
-        execFileSync(CONTAINER_RUNTIME_BIN, ['rm', '-f', containerName], { stdio: 'pipe' });
-      } catch { /* ignore */ }
+        execFileSync(CONTAINER_RUNTIME_BIN, ['rm', '-f', containerName], {
+          stdio: 'pipe',
+        });
+      } catch {
+        /* ignore */
+      }
       resolve({
         status: 'error',
         result: null,

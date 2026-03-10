@@ -54,8 +54,13 @@ export async function startCredentialProxy(
       const proxyMod = 'https-proxy-agent';
       const mod = await import(/* webpackIgnore: true */ proxyMod);
       proxyAgent = new mod.HttpsProxyAgent(httpsProxyUrl) as unknown as Agent;
-      logger.info({ proxy: httpsProxyUrl }, 'Credential proxy using HTTPS proxy agent');
-    } catch { /* https-proxy-agent not installed — direct connection */ }
+      logger.info(
+        { proxy: httpsProxyUrl },
+        'Credential proxy using HTTPS proxy agent',
+      );
+    } catch {
+      /* https-proxy-agent not installed — direct connection */
+    }
   }
 
   return new Promise((resolve, reject) => {
