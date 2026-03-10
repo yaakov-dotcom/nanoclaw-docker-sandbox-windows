@@ -193,11 +193,13 @@ Note: The Docker Desktop proxy does NOT work with OAuth tokens — only API keys
 
 **If IS_SANDBOX=false (normal setup):**
 
-AskUserQuestion: Claude subscription (Pro/Max) vs Anthropic API key?
+AskUserQuestion: "How do you want to authenticate with Claude?"
+- **Claude subscription (Pro/Max):** Use your existing Claude Pro or Max subscription. No API key needed.
+- **Anthropic API key:** Use an API key from console.anthropic.com.
 
 **Subscription:** Tell user to run `claude setup-token` in another terminal, copy the token, add `CLAUDE_CODE_OAUTH_TOKEN=<token>` to `.env`. Do NOT collect the token in chat.
 
-**API key:** Tell user to add `ANTHROPIC_API_KEY=<key>` to `.env`.
+**API key:** Tell the user: "Go to https://console.anthropic.com → API Keys → Create Key. The key starts with `sk-ant-...`". AskUserQuestion for confirmation they have the key, then tell them to add `ANTHROPIC_API_KEY=<key>` to `.env`. Do NOT collect the key in chat.
 
 ## 5. Install Skills Marketplace
 
