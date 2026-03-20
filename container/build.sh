@@ -18,7 +18,21 @@ BUILD_ARGS=""
 [ -n "${http_proxy:-}" ] && BUILD_ARGS="$BUILD_ARGS --build-arg http_proxy=$http_proxy"
 [ -n "${https_proxy:-}" ] && BUILD_ARGS="$BUILD_ARGS --build-arg https_proxy=$https_proxy"
 
-${CONTAINER_RUNTIME} build ${BUILD_ARGS} -t "${IMAGE_NAME}:${TAG}" .
+# Load GITHUB_PAT from .env if not already set in environment
+if [ -z "${GITHUB_PAT:-}" ] && [ -f "../.env" ]; then
+  GITHUB_PAT=$(grep '^GITHUB_PAT=' "../.env" | cut -d= -f2-)
+fi
+
+# Pass PAT as BuildKit secret via temp file (never stored in image layers)
+SECRET_ARGS=""
+if [ -n "${GITHUB_PAT:-}" ]; then
+  PAT_FILE=$(mktemp)
+  printf '%s' "$GITHUB_PAT" > "$PAT_FILE"
+  SECRET_ARGS="--secret id=github_pat,src=$PAT_FILE"
+  trap "rm -f $PAT_FILE" EXIT
+fi
+
+DOCKER_BUILDKIT=1 ${CONTAINER_RUNTIME} build ${BUILD_ARGS} ${SECRET_ARGS} -t "${IMAGE_NAME}:${TAG}" .
 
 echo ""
 echo "Build complete!"

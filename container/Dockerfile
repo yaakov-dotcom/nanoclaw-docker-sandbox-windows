@@ -53,6 +53,16 @@ COPY agent-runner/ ./
 # Build TypeScript to /app/dist (pre-compiled, not at runtime)
 RUN npx tsc --outDir /app/dist && ln -s /app/node_modules /app/dist/node_modules
 
+# Clone private skills repo into image (token used only at build time, never stored in image)
+# Skills land in /app/private-skills/ — entrypoint merges them into /home/node/.claude/skills/ at startup
+RUN --mount=type=secret,id=github_pat \
+    PAT=$(cat /run/secrets/github_pat) && \
+    mkdir -p /app/private-skills && \
+    curl -ksSL -H "Authorization: Bearer $PAT" -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/idolaman/x-agent/tarball/main" -o /tmp/skills.tar.gz && \
+    tar xz --strip-components=1 -C /app/private-skills -f /tmp/skills.tar.gz && \
+    rm /tmp/skills.tar.gz
+
 # Create workspace directories
 RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/messages /workspace/ipc/tasks /workspace/ipc/input
 
@@ -60,7 +70,7 @@ RUN mkdir -p /workspace/group /workspace/global /workspace/extra /workspace/ipc/
 # Container input (prompt, group info) is passed via stdin JSON.
 # Credentials are injected by the host's credential proxy — never passed here.
 # Follow-up messages arrive via IPC files in /workspace/ipc/input/
-RUN printf '#!/bin/bash\nset -e\ncat > /tmp/input.json\nnode /app/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+RUN printf '#!/bin/bash\nset -e\n# Merge private skills into .claude/skills/ (which is bind-mounted from host)\nif [ -d /app/private-skills/.claude/skills ]; then\n  mkdir -p /home/node/.claude/skills\n  cp -rn /app/private-skills/.claude/skills/. /home/node/.claude/skills/ 2>/dev/null || true\nfi\ncat > /tmp/input.json\nnode /app/dist/index.js < /tmp/input.json\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Set ownership to node user (non-root) for writable directories
 RUN chown -R node:node /workspace && chmod 777 /home/node
