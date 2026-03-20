@@ -472,6 +472,21 @@ function ensureContainerSystemRunning(): void {
 
 async function main(): Promise<void> {
   ensureContainerSystemRunning();
+
+  // Start CDP relay for Chrome remote debugging (sandbox only)
+  if (IS_SANDBOX) {
+    const cdpProxyPath = path.join(process.cwd(), 'cdp-proxy.mjs');
+    if (fs.existsSync(cdpProxyPath)) {
+      const { spawn: spawnChild } = await import('child_process');
+      const cdp = spawnChild('node', [cdpProxyPath], {
+        stdio: 'ignore',
+        detached: true,
+      });
+      cdp.unref();
+      logger.info('CDP relay started (cdp-proxy.mjs)');
+    }
+  }
+
   initDatabase();
   logger.info('Database initialized');
   loadState();
