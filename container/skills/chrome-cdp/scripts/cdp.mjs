@@ -35,7 +35,14 @@ function sockPath(targetId) {
     : resolve(RUNTIME_DIR, `cdp-${targetId}.sock`);
 }
 
-function getWsUrl() {
+async function getWsUrl() {
+  if (process.env.CDP_PORT) {
+    const host = process.env.CDP_HOST || '127.0.0.1';
+    const res = await fetch(`http://${host}:${process.env.CDP_PORT}/json/version`);
+    const data = await res.json();
+    // Rewrite the URL to use our host/port (Chrome reports localhost)
+    return data.webSocketDebuggerUrl.replace(/ws:\/\/[^/]+/, `ws://${host}:${process.env.CDP_PORT}`);
+  }
   const home = homedir();
   // macOS: ~/Library/Application Support/<name>/DevToolsActivePort
   const macBrowsers = [
@@ -84,9 +91,6 @@ function getWsUrl() {
   const lines = readFileSync(portFile, 'utf8').trim().split('\n');
   if (lines.length < 2 || !lines[0] || !lines[1]) throw new Error(`Invalid DevToolsActivePort file: ${portFile}`);
   const host = process.env.CDP_HOST || '127.0.0.1';
-  if (process.env.CDP_PORT) {
-    return `ws://${host}:${process.env.CDP_PORT}/json/version`;
-  }
   return `ws://${host}:${lines[0]}${lines[1]}`;
 }
 
@@ -491,7 +495,7 @@ async function runDaemon(targetId) {
 
   const cdp = new CDP();
   try {
-    await cdp.connect(getWsUrl());
+    await cdp.connect(await getWsUrl());
   } catch (e) {
     process.stderr.write(`Daemon: cannot connect to Chrome: ${e.message}\n`);
     process.exit(1);
@@ -794,7 +798,7 @@ async function main() {
 
   if (cmd === 'list' || cmd === 'ls') {
     const cdp = new CDP();
-    await cdp.connect(getWsUrl());
+    await cdp.connect(await getWsUrl());
     const pages = await getPages(cdp);
     cdp.close();
     writeFileSync(PAGES_CACHE, JSON.stringify(pages), { mode: 0o600 });
@@ -807,7 +811,7 @@ async function main() {
   if (cmd === 'open') {
     const url = args[0] || 'about:blank';
     const cdp = new CDP();
-    await cdp.connect(getWsUrl());
+    await cdp.connect(await getWsUrl());
     const { targetId } = await cdp.send('Target.createTarget', { url });
     // Refresh cache; new tab may not appear in getTargets immediately, so add it manually
     const pages = await getPages(cdp);
